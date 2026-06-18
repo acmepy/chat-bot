@@ -231,6 +231,7 @@ Una tool tiene esta forma:
 const myTool = {
   name: 'myTool',
   description: 'Describe cuando usar la herramienta.',
+  instructions: 'Indica al modelo en que casos debe usar esta tool.',
   parameters: {
     type: 'object',
     properties: {},
@@ -245,9 +246,17 @@ const myTool = {
 };
 ```
 
+Campos:
+
+- `name`: identificador unico de la tool.
+- `description`: descripcion corta para la metadata.
+- `instructions`: instruccion opcional que se agrega al prompt cuando la tool se registra.
+- `parameters`: esquema simple de argumentos esperados.
+- `execute`: funcion que ejecuta la herramienta.
+
 El core usa una estrategia simple:
 
-1. Hace un primer llamado al LLM con metadata de tools.
+1. Hace un primer llamado al LLM con metadata de tools, incluyendo `instructions` cuando existen.
 2. Si el LLM responde normalmente, esa es la respuesta final.
 3. Si el LLM responde JSON con `{ "tool": "...", "input": {} }`, ejecuta una tool registrada.
 4. Agrega el resultado de la tool al prompt.
@@ -269,6 +278,12 @@ Input esperado:
 { query: 'consultar stock' }
 ```
 
+Instruccion cargada en el prompt:
+
+```txt
+Si el usuario pide buscar o ubicar informacion en los recursos, usa esta tool.
+```
+
 `getCurrentDateTool` devuelve fecha y hora actual:
 
 ```js
@@ -279,6 +294,12 @@ Input esperado:
 
 ```js
 {}
+```
+
+Instruccion cargada en el prompt:
+
+```txt
+Si el usuario pregunta la hora, fecha, dia actual o momento actual, usa esta tool.
 ```
 
 Estas tools son informativas. No consultan datos reales del ERP ni modifican datos externos.
