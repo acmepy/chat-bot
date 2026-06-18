@@ -39,6 +39,7 @@ export function createChatbot(options = {}) {
     const summary = session.summary || '';
     const history = [...(session.messages || [])];
     const toolsMetadata = config.toolsEnabled ? toolRegistry.getMetadata() : [];
+    const deterministicToolCall = getDeterministicToolCall(message, toolRegistry, config);
 
     const prompt = promptBuilder.build({
       systemPrompt,
@@ -55,20 +56,9 @@ export function createChatbot(options = {}) {
 
     await sessionProvider.addMessage(session.id, userMessage);
 
-    let answer = await llmProvider.generate({
-      prompt,
-      systemPrompt,
-      resources,
-      context: context || '',
-      summary,
-      history,
-      message,
-      options: config
-    });
-
-    const toolCall = parseToolCall(answer, toolRegistry);
-    if (config.toolsEnabled && config.maxToolCalls === 1 && toolCall) {
-      const toolResult = await toolRunner.run(toolCall.tool, toolCall.input, {
+    let answer;
+    if (deterministicToolCall) {
+      const toolResult = await toolRunner.run(deterministicToolCall.tool, deterministicToolCall.input, {
         context: context || {},
         session,
         resources,
@@ -94,6 +84,47 @@ export function createChatbot(options = {}) {
         message,
         options: config
       });
+    } else {
+      answer = await llmProvider.generate({
+        prompt,
+        systemPrompt,
+        resources,
+        context: context || '',
+        summary,
+        history,
+        message,
+        options: config
+      });
+
+      const toolCall = parseToolCall(answer, toolRegistry);
+      if (config.toolsEnabled && config.maxToolCalls === 1 && toolCall) {
+        const toolResult = await toolRunner.run(toolCall.tool, toolCall.input, {
+          context: context || {},
+          session,
+          resources,
+          config
+        });
+        const finalPrompt = promptBuilder.build({
+          systemPrompt,
+          resources,
+          context: context || '',
+          summary,
+          history,
+          message,
+          toolResult
+        });
+
+        answer = await llmProvider.generate({
+          prompt: finalPrompt,
+          systemPrompt,
+          resources,
+          context: context || '',
+          summary,
+          history,
+          message,
+          options: config
+        });
+      }
     }
 
     const assistantMessage = { role: 'assistant', content: answer, createdAt: now };
@@ -111,6 +142,44 @@ export function createChatbot(options = {}) {
   }
 
   return { sendMessage };
+}
+
+function getDeterministicToolCall(message, registry, config) {
+  if (!config.toolsEnabled || config.maxToolCalls !== 1 || !registry.get('getCurrentDate')) {
+    return null;
+  }
+
+  if (!isDateTimeQuestion(message)) {
+    return null;
+  }
+
+  return {
+    tool: 'getCurrentDate',
+    input: {}
+  };
+}
+
+function isDateTimeQuestion(message) {
+  const normalized = normalizeText(message);
+
+  return [
+    /\bque hora\b/,
+    /\bhora es\b/,
+    /\bhora actual\b/,
+    /\bfecha actual\b/,
+    /\bque fecha\b/,
+    /\bfecha es\b/,
+    /\bdia es hoy\b/,
+    /\bque dia\b/,
+    /\bmomento actual\b/
+  ].some((pattern) => pattern.test(normalized));
+}
+
+function normalizeText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 }
 
 function parseToolCall(response, registry) {

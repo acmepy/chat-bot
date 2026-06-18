@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Local chatbot sessions and generated conversation state
+.sessions/
+sessions/
+
+# Environment and local configuration
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test and coverage output
+coverage/
+.nyc_output/
+
+# Build and package output
+dist/
+build/
+*.tgz
+
+# Runtime caches
+.cache/
+.tmp/
+tmp/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

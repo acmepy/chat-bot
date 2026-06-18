@@ -42,6 +42,7 @@ describe('ToolRegistry', () => {
     const tool = {
       name: 'metadataTool',
       description: 'Tool con metadata.',
+      instructions: 'Usar esta tool en pruebas.',
       parameters: { type: 'object', properties: {}, required: [] },
       execute: async () => ({ ok: true, data: {} })
     };
@@ -49,6 +50,7 @@ describe('ToolRegistry', () => {
     const metadata = registry.getMetadata();
 
     assert.equal(metadata[0].name, 'metadataTool');
+    assert.equal(metadata[0].instructions, 'Usar esta tool en pruebas.');
     assert.equal(metadata[0].execute, undefined);
   });
 });

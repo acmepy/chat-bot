@@ -11,6 +11,10 @@ describe('getCurrentDateTool', () => {
 
     assert.equal(result.ok, true);
     assert.ok(Date.parse(result.data.now));
+    assert.equal(typeof result.data.localNow, 'string');
+    assert.ok(result.data.localNow.length > 0);
     assert.equal(result.data.timezone, 'America/Asuncion');
+    assert.match(result.data.answer, /La fecha y hora actual es/);
+    assert.match(result.data.answer, /America\/Asuncion/);
   });
 });

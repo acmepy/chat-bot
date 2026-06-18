@@ -22,4 +22,7 @@ export function validateTool(tool) {
   if (typeof tool.execute !== 'function') {
     throw new Error(`Tool invalida: execute es requerido para ${tool.name}`);
   }
+  if (tool.instructions !== undefined && typeof tool.instructions !== 'string') {
+    throw new Error(`Tool invalida: instructions debe ser string para ${tool.name}`);
+  }
 }

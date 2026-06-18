@@ -323,6 +323,55 @@ describe('createChatbot', () => {
     assert.equal(llmProvider.generate.mock.callCount(), 2);
   });
 
+  it('debe ejecutar getCurrentDate directamente para preguntas de hora', async () => {
+    const { createChatbot } = await import('../src/core/chatbot.js');
+    const tool = {
+      name: 'getCurrentDate',
+      description: 'Devuelve la fecha y hora actual.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: mock.fn(async () => ({
+        ok: true,
+        data: {
+          now: '2026-06-18T12:00:00.000Z',
+          localNow: '18/6/2026, 08:00:00 hora de Paraguay',
+          timezone: 'America/Asuncion'
+        }
+      }))
+    };
+    const llmProvider = {
+      generate: mock.fn(({ prompt }) => {
+        assert.match(prompt, /RESULTADO DE TOOL/);
+        return 'Son las 08:00 en America/Asuncion.';
+      })
+    };
+    const resourceProvider = {
+      loadResources: mock.fn(() => ''),
+      loadSystemPrompt: mock.fn(() => '')
+    };
+    const sessionProvider = {
+      createSession: mock.fn(async (data) => ({ id: 's1', summary: '', messages: [], ...data })),
+      getSession: mock.fn(() => null),
+      addMessage: mock.fn(),
+      saveSession: mock.fn(),
+      getHistory: mock.fn(() => []),
+      getSummary: mock.fn(() => null),
+      updateSummary: mock.fn()
+    };
+
+    const chatbot = createChatbot({
+      llmProvider,
+      resourceProvider,
+      sessionProvider,
+      tools: [tool],
+      timezone: 'America/Asuncion'
+    });
+    const result = await chatbot.sendMessage({ message: 'Que hora es?' });
+
+    assert.equal(result.answer, 'Son las 08:00 en America/Asuncion.');
+    assert.equal(tool.execute.mock.callCount(), 1);
+    assert.equal(llmProvider.generate.mock.callCount(), 1);
+  });
+
   it('no debe ejecutar tools si toolsEnabled es false', async () => {
     const { createChatbot } = await import('../src/core/chatbot.js');
     const tool = {

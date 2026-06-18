@@ -60,6 +60,11 @@ export class PromptBuilder {
       parts.push('No uses herramientas que no esten listadas.');
       parts.push('No inventes herramientas.');
       parts.push('No uses herramientas para ejecutar acciones reales si no estan permitidas.');
+      for (const tool of tools) {
+        if (tool.instructions) {
+          parts.push(`${tool.name}: ${tool.instructions}`);
+        }
+      }
       parts.push('Si no necesitas herramienta, responde normalmente.');
       parts.push('');
     }
@@ -68,6 +73,7 @@ export class PromptBuilder {
       parts.push('=== RESULTADO DE TOOL ===');
       parts.push(JSON.stringify(toolResult, null, 2));
       parts.push('');
+      parts.push('Si el resultado contiene data.answer, responde exactamente ese texto y no agregues explicaciones.');
       parts.push('Usa este resultado para responder al usuario. No vuelvas a pedir otra tool.');
       parts.push('');
     }

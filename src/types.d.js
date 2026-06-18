@@ -85,6 +85,7 @@
  * @typedef {Object} ChatbotTool
  * @property {string} name
  * @property {string} description
+ * @property {string} [instructions]
  * @property {Object} parameters
  * @property {(input: Object, context: Object) => Promise<{ok?: boolean, data?: Object}|Object>} execute
  */

@@ -36,11 +36,19 @@ export class ToolRegistry {
   }
 
   getMetadata() {
-    return this.list().map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters
-    }));
+    return this.list().map((tool) => {
+      const metadata = {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters
+      };
+
+      if (tool.instructions) {
+        metadata.instructions = tool.instructions;
+      }
+
+      return metadata;
+    });
   }
 
 }

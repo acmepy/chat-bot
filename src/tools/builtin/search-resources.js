@@ -39,6 +39,7 @@ function splitResources(resources) {
 export const searchResourcesTool = defineTool({
   name: 'searchResources',
   description: 'Busca coincidencias simples en los recursos cargados del chatbot.',
+  instructions: 'Si el usuario pide buscar o ubicar informacion en los recursos, usa esta tool.',
   parameters: {
     type: 'object',
     properties: {
@@ -61,7 +62,7 @@ export const searchResourcesTool = defineTool({
       };
     }
 
-    const queryTerms = normalizeText(query).split(/\s+/).filter(Boolean);
+  const queryTerms = normalizeText(query).split(/\s+/).filter(Boolean);
     const resources = splitResources(context.resources);
     const matches = [];
 

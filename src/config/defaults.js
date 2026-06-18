@@ -11,5 +11,7 @@ export default {
   maxToolCalls: 1,
 
   temperature: 0.3,
-  allowUnknownAnswers: false
+  allowUnknownAnswers: false, 
+
+  timezone:'America/Asuncion'
 };
