@@ -42,7 +42,9 @@ import {
   createChatbot,
   OllamaProvider,
   FileResourceProvider,
-  FileSessionProvider
+  FileSessionProvider,
+  searchResourcesTool,
+  getCurrentDateTool
 } from 'chatbot-core';
 
 const chatbot = createChatbot({
@@ -54,7 +56,11 @@ const chatbot = createChatbot({
   }),
   sessionProvider: new FileSessionProvider({
     path: path.resolve('.sessions')
-  })
+  }),
+  tools: [
+    searchResourcesTool,
+    getCurrentDateTool
+  ]
 });
 
 const response = await chatbot.sendMessage({
@@ -102,7 +108,11 @@ import {
   OllamaProvider,
   FileResourceProvider,
   MemorySessionProvider,
-  FileSessionProvider
+  FileSessionProvider,
+  ToolRegistry,
+  ToolRunner,
+  searchResourcesTool,
+  getCurrentDateTool
 } from 'chatbot-core';
 ```
 
@@ -115,6 +125,7 @@ Opciones requeridas:
 - `llmProvider`: objeto con metodo `generate(params)`.
 - `resourceProvider`: objeto con metodos `loadResources()` y `loadSystemPrompt()`.
 - `sessionProvider`: proveedor compatible con sesiones.
+- `tools`: array opcional de herramientas disponibles para el chatbot.
 
 Opciones de configuracion:
 
@@ -123,6 +134,8 @@ Opciones de configuracion:
 | `maxMessageLength` | `2000` | Longitud maxima permitida para mensajes de usuario. |
 | `maxHistoryMessages` | `10` | Cantidad de mensajes a partir de la cual se compacta el historial. |
 | `maxSummaryLength` | `1000` | Longitud maxima del resumen guardado en la sesion. |
+| `toolsEnabled` | `true` | Permite registrar metadata y ejecutar tools si el modelo las solicita. |
+| `maxToolCalls` | `1` | Cantidad maxima de tools por mensaje. En esta version debe ser `1`. |
 | `temperature` | `0.3` | Temperatura enviada al provider LLM. |
 | `summaryTemperature` | `0.1` | Temperatura usada para resumir historial, si se configura. |
 
@@ -208,6 +221,68 @@ Guarda sesiones en memoria usando un `Map`. Es util para tests, procesos tempora
 const sessionProvider = new MemorySessionProvider();
 ```
 
+## Tools
+
+Las tools permiten agregar funciones controladas sin modificar el core para cada caso nuevo. Son opcionales: si no se pasan tools, el chatbot funciona igual que antes.
+
+Una tool tiene esta forma:
+
+```js
+const myTool = {
+  name: 'myTool',
+  description: 'Describe cuando usar la herramienta.',
+  parameters: {
+    type: 'object',
+    properties: {},
+    required: []
+  },
+  async execute(input, context) {
+    return {
+      ok: true,
+      data: {}
+    };
+  }
+};
+```
+
+El core usa una estrategia simple:
+
+1. Hace un primer llamado al LLM con metadata de tools.
+2. Si el LLM responde normalmente, esa es la respuesta final.
+3. Si el LLM responde JSON con `{ "tool": "...", "input": {} }`, ejecuta una tool registrada.
+4. Agrega el resultado de la tool al prompt.
+5. Hace un segundo llamado al LLM para generar la respuesta final.
+
+No se ejecutan tools desconocidas, JSON invalido ni multiples tools por mensaje.
+
+### Builtin tools
+
+`searchResourcesTool` busca coincidencias simples en los recursos cargados:
+
+```js
+import { searchResourcesTool } from 'chatbot-core';
+```
+
+Input esperado:
+
+```js
+{ query: 'consultar stock' }
+```
+
+`getCurrentDateTool` devuelve fecha y hora actual:
+
+```js
+import { getCurrentDateTool } from 'chatbot-core';
+```
+
+Input esperado:
+
+```js
+{}
+```
+
+Estas tools son informativas. No consultan datos reales del ERP ni modifican datos externos.
+
 ## Recursos y comportamiento
 
 Los recursos son la fuente de conocimiento del asistente. En el ejemplo basico se usan archivos Markdown como:
@@ -266,6 +341,7 @@ src/
     llm/                proveedor de Ollama
     resources/          carga de recursos desde archivos
     sessions/           sesiones en memoria o archivo
+  tools/                registry y tools builtin
   prompts/              prompt base del sistema
   errors/               errores de la libreria
 examples/basic/         ejemplo interactivo con recursos de Inventiva

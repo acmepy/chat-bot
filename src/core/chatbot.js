@@ -2,16 +2,20 @@ import defaults from '../config/defaults.js';
 import { MessageRequiredError, MessageTooLongError } from '../errors/chatbot.js';
 import { PromptBuilder } from './prompt-builder.js';
 import { SummaryManager } from './summary-manager.js';
+import { ToolRunner } from './tool-runner.js';
+import { ToolRegistry } from '../tools/registry.js';
 
 export function createChatbot(options = {}) {
-  const config = { ...defaults, ...options };
-  const { llmProvider, resourceProvider, sessionProvider } = options;
+  const config = { ...defaults, ...(options.config || {}), ...options };
+  const { llmProvider, resourceProvider, sessionProvider, tools = [] } = options;
 
   if (!llmProvider) throw new Error('llmProvider es requerido');
   if (!resourceProvider)throw new Error('resourceProvider es requerido');
   if (!sessionProvider) throw new Error('sessionProvider es requerido');
 
   const promptBuilder = new PromptBuilder();
+  const toolRegistry = new ToolRegistry(tools);
+  const toolRunner = new ToolRunner({ registry: toolRegistry });
   const summaryManager = new SummaryManager({
     maxHistoryMessages: config.maxHistoryMessages,
     maxSummaryLength: config.maxSummaryLength,
@@ -34,6 +38,7 @@ export function createChatbot(options = {}) {
     const systemPrompt = await resourceProvider.loadSystemPrompt();
     const summary = session.summary || '';
     const history = [...(session.messages || [])];
+    const toolsMetadata = config.toolsEnabled ? toolRegistry.getMetadata() : [];
 
     const prompt = promptBuilder.build({
       systemPrompt,
@@ -41,7 +46,8 @@ export function createChatbot(options = {}) {
       context: context || '',
       summary,
       history,
-      message
+      message,
+      tools: toolsMetadata
     });
 
     const now = new Date().toISOString();
@@ -49,7 +55,7 @@ export function createChatbot(options = {}) {
 
     await sessionProvider.addMessage(session.id, userMessage);
 
-    const answer = await llmProvider.generate({
+    let answer = await llmProvider.generate({
       prompt,
       systemPrompt,
       resources,
@@ -59,6 +65,36 @@ export function createChatbot(options = {}) {
       message,
       options: config
     });
+
+    const toolCall = parseToolCall(answer, toolRegistry);
+    if (config.toolsEnabled && config.maxToolCalls === 1 && toolCall) {
+      const toolResult = await toolRunner.run(toolCall.tool, toolCall.input, {
+        context: context || {},
+        session,
+        resources,
+        config
+      });
+      const finalPrompt = promptBuilder.build({
+        systemPrompt,
+        resources,
+        context: context || '',
+        summary,
+        history,
+        message,
+        toolResult
+      });
+
+      answer = await llmProvider.generate({
+        prompt: finalPrompt,
+        systemPrompt,
+        resources,
+        context: context || '',
+        summary,
+        history,
+        message,
+        options: config
+      });
+    }
 
     const assistantMessage = { role: 'assistant', content: answer, createdAt: now };
     await sessionProvider.addMessage(session.id, assistantMessage);
@@ -75,4 +111,35 @@ export function createChatbot(options = {}) {
   }
 
   return { sendMessage };
+}
+
+function parseToolCall(response, registry) {
+  let parsed;
+
+  try {
+    parsed = JSON.parse(String(response || '').trim());
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null;
+  }
+  if (!parsed.tool || typeof parsed.tool !== 'string') {
+    return null;
+  }
+  if (!registry.get(parsed.tool)) {
+    return null;
+  }
+  if (parsed.input === undefined) {
+    parsed.input = {};
+  }
+  if (!parsed.input || typeof parsed.input !== 'object' || Array.isArray(parsed.input)) {
+    return null;
+  }
+
+  return {
+    tool: parsed.tool,
+    input: parsed.input
+  };
 }

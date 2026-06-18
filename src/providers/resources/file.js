@@ -27,7 +27,7 @@ export class FileResourceProvider {
 
         const filePath = path.join(this._resourcesPath, entry.name);
         const content = await fs.readFile(filePath, 'utf-8');
-        parts.push(content);
+        parts.push(`Fuente: ${entry.name}\n${content}`);
       }
 
       return parts.join('\n\n---\n\n');

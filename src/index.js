@@ -3,3 +3,7 @@ export { OllamaProvider } from './providers/llm/ollama.js';
 export { FileResourceProvider } from './providers/resources/file.js';
 export { MemorySessionProvider } from './providers/sessions/memory.js';
 export { FileSessionProvider } from './providers/sessions/file.js';
+export { ToolRunner } from './core/tool-runner.js';
+export { ToolRegistry } from './tools/registry.js';
+export { searchResourcesTool } from './tools/builtin/search-resources.js';
+export { getCurrentDateTool } from './tools/builtin/get-current-date.js';

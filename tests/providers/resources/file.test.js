@@ -32,6 +32,7 @@ describe('FileResourceProvider', () => {
     await fs.writeFile(path.join(tmpDir, 'test.md'), '# Test Resource');
     const provider = new FileResourceProvider({ resourcesPath: tmpDir });
     const result = await provider.loadResources();
+    assert.ok(result.includes('Fuente: test.md'));
     assert.ok(result.includes('# Test Resource'));
   });
 

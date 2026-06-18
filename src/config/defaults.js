@@ -7,6 +7,8 @@ export default {
   maxMessageLength: 2000,
   maxHistoryMessages: 10,
   maxSummaryLength: 1000,
+  toolsEnabled: true,
+  maxToolCalls: 1,
 
   temperature: 0.3,
   allowUnknownAnswers: false

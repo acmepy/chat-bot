@@ -4,7 +4,16 @@ export class PromptBuilder {
     this._summaryPrompt = summaryPrompt;
   }
 
-  build({ systemPrompt = '', resources = '', context = '', summary = '', history = [], message } = {}) {
+  build({
+    systemPrompt = '',
+    resources = '',
+    context = '',
+    summary = '',
+    history = [],
+    message,
+    tools = [],
+    toolResult = null
+  } = {}) {
     const parts = [];
 
     parts.push(systemPrompt || this._systemPrompt || 'Eres un asistente del sistema.');
@@ -33,6 +42,33 @@ export class PromptBuilder {
       for (const msg of history) {
         parts.push(`${msg.role}: ${msg.content}`);
       }
+      parts.push('');
+    }
+
+    if (tools && tools.length > 0) {
+      parts.push('=== TOOLS ===');
+      parts.push('Tienes disponibles estas herramientas:');
+      parts.push(JSON.stringify(tools, null, 2));
+      parts.push('');
+      parts.push('Si necesitas usar una herramienta, responde unicamente con JSON valido:');
+      parts.push('{');
+      parts.push('  "tool": "nombreDeTool",');
+      parts.push('  "input": {}');
+      parts.push('}');
+      parts.push('');
+      parts.push('No expliques el JSON.');
+      parts.push('No uses herramientas que no esten listadas.');
+      parts.push('No inventes herramientas.');
+      parts.push('No uses herramientas para ejecutar acciones reales si no estan permitidas.');
+      parts.push('Si no necesitas herramienta, responde normalmente.');
+      parts.push('');
+    }
+
+    if (toolResult) {
+      parts.push('=== RESULTADO DE TOOL ===');
+      parts.push(JSON.stringify(toolResult, null, 2));
+      parts.push('');
+      parts.push('Usa este resultado para responder al usuario. No vuelvas a pedir otra tool.');
       parts.push('');
     }
 

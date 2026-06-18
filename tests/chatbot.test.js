@@ -2,13 +2,17 @@ import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 describe('exports públicos', () => {
-  it('debe exportar createChatbot, OllamaProvider, FileResourceProvider, MemorySessionProvider, FileSessionProvider', async () => {
+  it('debe exportar la API publica', async () => {
     const mod = await import('../src/index.js');
     assert.equal(typeof mod.createChatbot, 'function');
     assert.equal(typeof mod.OllamaProvider, 'function');
     assert.equal(typeof mod.FileResourceProvider, 'function');
     assert.equal(typeof mod.MemorySessionProvider, 'function');
     assert.equal(typeof mod.FileSessionProvider, 'function');
+    assert.equal(typeof mod.ToolRegistry, 'function');
+    assert.equal(typeof mod.ToolRunner, 'function');
+    assert.equal(typeof mod.searchResourcesTool, 'object');
+    assert.equal(typeof mod.getCurrentDateTool, 'object');
   });
 });
 
@@ -258,5 +262,103 @@ describe('createChatbot', () => {
     assert.equal(sessionData.summary, 'Resumen semantico actualizado');
     assert.equal(llmProvider.generate.mock.callCount(), 2);
     assert.equal(sessionData.messages.at(-1).content, 'respuesta');
+  });
+
+  it('debe funcionar sin tools', async () => {
+    const { createChatbot } = await import('../src/core/chatbot.js');
+    const llmProvider = { generate: mock.fn(() => 'respuesta sin tools') };
+    const resourceProvider = {
+      loadResources: mock.fn(() => ''),
+      loadSystemPrompt: mock.fn(() => '')
+    };
+    const sessionProvider = {
+      createSession: mock.fn(async (data) => ({ id: 's1', summary: '', messages: [], ...data })),
+      getSession: mock.fn(() => null),
+      addMessage: mock.fn(),
+      saveSession: mock.fn(),
+      getHistory: mock.fn(() => []),
+      getSummary: mock.fn(() => null),
+      updateSummary: mock.fn()
+    };
+
+    const chatbot = createChatbot({ llmProvider, resourceProvider, sessionProvider });
+    const result = await chatbot.sendMessage({ message: 'Hola' });
+
+    assert.equal(result.answer, 'respuesta sin tools');
+    assert.equal(llmProvider.generate.mock.callCount(), 1);
+  });
+
+  it('debe registrar y ejecutar tools opcionales', async () => {
+    const { createChatbot } = await import('../src/core/chatbot.js');
+    const tool = {
+      name: 'lookup',
+      description: 'Busca informacion de prueba.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: mock.fn(async () => ({ ok: true, data: { value: 'dato' } }))
+    };
+    const llmProvider = {
+      generate: mock.fn(({ prompt }) => prompt.includes('RESULTADO DE TOOL')
+        ? 'respuesta final con dato'
+        : JSON.stringify({ tool: 'lookup', input: {} }))
+    };
+    const resourceProvider = {
+      loadResources: mock.fn(() => ''),
+      loadSystemPrompt: mock.fn(() => '')
+    };
+    const sessionProvider = {
+      createSession: mock.fn(async (data) => ({ id: 's1', summary: '', messages: [], ...data })),
+      getSession: mock.fn(() => null),
+      addMessage: mock.fn(),
+      saveSession: mock.fn(),
+      getHistory: mock.fn(() => []),
+      getSummary: mock.fn(() => null),
+      updateSummary: mock.fn()
+    };
+
+    const chatbot = createChatbot({ llmProvider, resourceProvider, sessionProvider, tools: [tool] });
+    const result = await chatbot.sendMessage({ message: 'Usa una tool' });
+
+    assert.equal(result.answer, 'respuesta final con dato');
+    assert.equal(tool.execute.mock.callCount(), 1);
+    assert.equal(llmProvider.generate.mock.callCount(), 2);
+  });
+
+  it('no debe ejecutar tools si toolsEnabled es false', async () => {
+    const { createChatbot } = await import('../src/core/chatbot.js');
+    const tool = {
+      name: 'lookup',
+      description: 'Busca informacion de prueba.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: mock.fn(async () => ({ ok: true, data: { value: 'dato' } }))
+    };
+    const llmProvider = {
+      generate: mock.fn(() => JSON.stringify({ tool: 'lookup', input: {} }))
+    };
+    const resourceProvider = {
+      loadResources: mock.fn(() => ''),
+      loadSystemPrompt: mock.fn(() => '')
+    };
+    const sessionProvider = {
+      createSession: mock.fn(async (data) => ({ id: 's1', summary: '', messages: [], ...data })),
+      getSession: mock.fn(() => null),
+      addMessage: mock.fn(),
+      saveSession: mock.fn(),
+      getHistory: mock.fn(() => []),
+      getSummary: mock.fn(() => null),
+      updateSummary: mock.fn()
+    };
+
+    const chatbot = createChatbot({
+      llmProvider,
+      resourceProvider,
+      sessionProvider,
+      tools: [tool],
+      toolsEnabled: false
+    });
+    const result = await chatbot.sendMessage({ message: 'Usa una tool' });
+
+    assert.equal(result.answer, JSON.stringify({ tool: 'lookup', input: {} }));
+    assert.equal(tool.execute.mock.callCount(), 0);
+    assert.equal(llmProvider.generate.mock.callCount(), 1);
   });
 });

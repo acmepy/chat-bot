@@ -3,14 +3,25 @@ import path from 'path';
 import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
 import { fileURLToPath } from 'url';
-import { createChatbot, OllamaProvider, FileResourceProvider, FileSessionProvider } from '../../src/index.js';
+import {
+  createChatbot,
+  OllamaProvider,
+  FileResourceProvider,
+  FileSessionProvider,
+  searchResourcesTool,
+  getCurrentDateTool
+} from '../../src/index.js';
 
 const exampleDir = path.dirname(fileURLToPath(import.meta.url));
 
 const chatbot = createChatbot({
   llmProvider: new OllamaProvider({model:'llama3.2:3b'}),
   resourceProvider: new FileResourceProvider({ resourcesPath: path.join(exampleDir, 'resources') }),
-  sessionProvider: new FileSessionProvider({ path: path.join(exampleDir, '..', '..', '.sessions') })
+  sessionProvider: new FileSessionProvider({ path: path.join(exampleDir, '..', '..', '.sessions') }),
+  tools: [
+    searchResourcesTool,
+    getCurrentDateTool
+  ]
 });
 
 const rl = readline.createInterface({ input, output });
