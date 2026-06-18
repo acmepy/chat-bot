@@ -1,0 +1,28 @@
+{
+  "name": "chatbot-core",
+  "version": "0.1.0",
+  "description": "Librería core para procesar conversaciones mediante LLMs",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "example-basic" : "cd ./examples/basic && node index.js"
+  },
+  "keywords": [
+    "chatbot",
+    "llm",
+    "ollama",
+    "conversation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "license": "MIT"
+}
