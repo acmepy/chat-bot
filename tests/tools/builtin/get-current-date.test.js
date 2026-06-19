@@ -2,6 +2,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 describe('getCurrentDateTool', () => {
+  it('debe declarar instrucciones de uso', async () => {
+    const { getCurrentDateTool } = await import('../../../src/tools/builtin/get-current-date.js');
+
+    assert.match(getCurrentDateTool.instructions, /hora/);
+  });
+
   it('debe devolver fecha actual y timezone', async () => {
     const { getCurrentDateTool } = await import('../../../src/tools/builtin/get-current-date.js');
 
@@ -15,6 +21,6 @@ describe('getCurrentDateTool', () => {
     assert.ok(result.data.localNow.length > 0);
     assert.equal(result.data.timezone, 'America/Asuncion');
     assert.match(result.data.answer, /La fecha y hora actual es/);
-    assert.match(result.data.answer, /America\/Asuncion/);
+    assert.ok(result.data.answer.includes(result.data.localNow));
   });
 });

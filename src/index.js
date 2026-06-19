@@ -7,3 +7,4 @@ export { ToolRunner } from './core/tool-runner.js';
 export { ToolRegistry } from './tools/registry.js';
 export { searchResourcesTool } from './tools/builtin/search-resources.js';
 export { getCurrentDateTool } from './tools/builtin/get-current-date.js';
+export { getCustomerBalanceDetailTool } from './tools/builtin/get-customer-balance-detail.js';

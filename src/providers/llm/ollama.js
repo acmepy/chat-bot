@@ -18,16 +18,22 @@ export class OllamaProvider {
     });
 
     const url = `${this._baseUrl}/api/generate`;
-    const body = JSON.stringify({
+    const request = {
       model: this._model,
       prompt: finalPrompt,
       stream: false,
       keep_alive: this._keepAlive,
       options: {
-        temperature: options?.temperature ?? 0.3,
+        temperature: options?.temperature ?? 0,
         stop: ['\nuser:', '\nusuario:', '\nUsuario:', '\nassistant:', '\nAsistente:']
       }
-    });
+    };
+
+    if (options?.format) {
+      request.format = options.format;
+    }
+
+    const body = JSON.stringify(request);
 
     let response;
     try {

@@ -10,7 +10,7 @@ export default {
   toolsEnabled: true,
   maxToolCalls: 1,
 
-  temperature: 0.3,
+  temperature: 0,
   allowUnknownAnswers: false, 
 
   timezone:'America/Asuncion'

@@ -44,7 +44,8 @@ import {
   FileResourceProvider,
   FileSessionProvider,
   searchResourcesTool,
-  getCurrentDateTool
+  getCurrentDateTool,
+  getCustomerBalanceDetailTool
 } from 'chatbot-core';
 
 const chatbot = createChatbot({
@@ -59,7 +60,8 @@ const chatbot = createChatbot({
   }),
   tools: [
     searchResourcesTool,
-    getCurrentDateTool
+    getCurrentDateTool,
+    getCustomerBalanceDetailTool
   ]
 });
 
@@ -112,7 +114,8 @@ import {
   ToolRegistry,
   ToolRunner,
   searchResourcesTool,
-  getCurrentDateTool
+  getCurrentDateTool,
+  getCustomerBalanceDetailTool
 } from 'chatbot-core';
 ```
 
@@ -136,7 +139,7 @@ Opciones de configuracion:
 | `maxSummaryLength` | `1000` | Longitud maxima del resumen guardado en la sesion. |
 | `toolsEnabled` | `true` | Permite registrar metadata y ejecutar tools si el modelo las solicita. |
 | `maxToolCalls` | `1` | Cantidad maxima de tools por mensaje. En esta version debe ser `1`. |
-| `temperature` | `0.3` | Temperatura enviada al provider LLM. |
+| `temperature` | `0` | Temperatura enviada al provider LLM. Use valores mayores si necesita respuestas mas variables. |
 | `summaryTemperature` | `0.1` | Temperatura usada para resumir historial, si se configura. |
 
 ### sendMessage({ message, sessionId, context })
@@ -232,6 +235,9 @@ const myTool = {
   name: 'myTool',
   description: 'Describe cuando usar la herramienta.',
   instructions: 'Indica al modelo en que casos debe usar esta tool.',
+  shouldUse({ message }) {
+    return message.includes('algo que esta tool resuelve');
+  },
   parameters: {
     type: 'object',
     properties: {},
@@ -251,16 +257,18 @@ Campos:
 - `name`: identificador unico de la tool.
 - `description`: descripcion corta para la metadata.
 - `instructions`: instruccion opcional que se agrega al prompt cuando la tool se registra.
+- `shouldUse`: funcion opcional para que la tool decida de forma deterministica si corresponde al mensaje.
 - `parameters`: esquema simple de argumentos esperados.
 - `execute`: funcion que ejecuta la herramienta.
 
 El core usa una estrategia simple:
 
-1. Hace un primer llamado al LLM con metadata de tools, incluyendo `instructions` cuando existen.
-2. Si el LLM responde normalmente, esa es la respuesta final.
-3. Si el LLM responde JSON con `{ "tool": "...", "input": {} }`, ejecuta una tool registrada.
-4. Agrega el resultado de la tool al prompt.
-5. Hace un segundo llamado al LLM para generar la respuesta final.
+1. Si alguna tool implementa `shouldUse` y devuelve `true`, ejecuta esa tool con `{ query: message }`.
+2. Si ninguna tool decide por `shouldUse`, hace una llamada de seleccion de tool en JSON.
+3. Si la seleccion devuelve `{ "tool": "...", "input": {} }`, ejecuta una tool registrada.
+4. Si el resultado contiene `data.answer`, responde directamente ese texto.
+5. Si la tool no devuelve `data.answer`, agrega el resultado al prompt y hace una llamada al LLM para generar la respuesta final.
+6. Si la seleccion devuelve `{ "tool": null, "input": {} }`, genera una respuesta normal sin tools.
 
 No se ejecutan tools desconocidas, JSON invalido ni multiples tools por mensaje.
 
@@ -301,6 +309,45 @@ Instruccion cargada en el prompt:
 ```txt
 Si el usuario pregunta la hora, fecha, dia actual o momento actual, usa esta tool.
 ```
+
+`getCustomerBalanceDetailTool` devuelve el detalle de saldo de un cliente desde un JSON mockeado incluido en la libreria:
+
+```js
+import { getCustomerBalanceDetailTool } from 'chatbot-core';
+```
+
+Input esperado:
+
+```js
+{ ruc: '80012345-6' }
+```
+
+O:
+
+```js
+{ customerCode: 'CLI-001' }
+```
+
+Output principal:
+
+```js
+{
+  found: true,
+  customer: {},
+  currency: 'PYG',
+  totalPending: 2090000,
+  pendingInvoices: [],
+  answer: '...'
+}
+```
+
+Instruccion cargada en el prompt:
+
+```txt
+Si el usuario pide detalle de saldo, facturas pendientes, deuda o saldo pendiente de un cliente, usa esta tool. Tambien usala en preguntas de seguimiento sobre otro cliente.
+```
+
+Por ahora lee datos desde `src/tools/data/customer-balances.json`. Mas adelante se puede cambiar el `execute` para hacer `fetch` a una API REST sin modificar el core.
 
 Estas tools son informativas. No consultan datos reales del ERP ni modifican datos externos.
 

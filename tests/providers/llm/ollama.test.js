@@ -41,6 +41,7 @@ describe('OllamaProvider', () => {
     assert.equal(parsed.stream, false);
     assert.match(parsed.prompt, /Recursos disponibles:/);
     assert.match(parsed.prompt, /Regla: responder desde recursos/);
+    assert.equal(parsed.options.temperature, 0);
     assert.deepEqual(parsed.options.stop, ['\nuser:', '\nusuario:', '\nUsuario:', '\nassistant:', '\nAsistente:']);
     assert.equal(result, 'respuesta mockeada');
 
@@ -67,6 +68,29 @@ describe('OllamaProvider', () => {
 
     const parsed = JSON.parse(requestBody);
     assert.equal(parsed.prompt, 'PROMPT FINAL');
+
+    mock.restoreAll();
+  });
+
+  it('debe enviar format cuando se configura', async () => {
+    let requestBody = '';
+
+    mock.method(globalThis, 'fetch', async (url, opts) => {
+      requestBody = opts.body;
+      return {
+        ok: true,
+        json: async () => ({ response: '{"tool":null,"input":{}}' })
+      };
+    });
+
+    const provider = new OllamaProvider({ model: 'gemma4' });
+    await provider.generate({
+      prompt: 'PROMPT FINAL',
+      options: { format: 'json' }
+    });
+
+    const parsed = JSON.parse(requestBody);
+    assert.equal(parsed.format, 'json');
 
     mock.restoreAll();
   });

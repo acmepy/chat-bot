@@ -1,0 +1,43 @@
+[
+  {
+    "customerCode": "CLI-001",
+    "ruc": "80012345-6",
+    "name": "Comercial San Miguel S.A.",
+    "currency": "PYG",
+    "pendingInvoices": [
+      {
+        "number": "001-001-0000123",
+        "issueDate": "2026-05-10",
+        "dueDate": "2026-06-10",
+        "amount": 1250000
+      },
+      {
+        "number": "001-001-0000148",
+        "issueDate": "2026-06-02",
+        "dueDate": "2026-07-02",
+        "amount": 840000
+      }
+    ]
+  },
+  {
+    "customerCode": "CLI-002",
+    "ruc": "1234567-8",
+    "name": "Cliente Demo",
+    "currency": "PYG",
+    "pendingInvoices": [
+      {
+        "number": "001-002-0000340",
+        "issueDate": "2026-04-21",
+        "dueDate": "2026-05-21",
+        "amount": 320000
+      }
+    ]
+  },
+  {
+    "customerCode": "CLI-003",
+    "ruc": "90045678-1",
+    "name": "Servicios del Este",
+    "currency": "PYG",
+    "pendingInvoices": []
+  }
+]

@@ -8,7 +8,7 @@
  * @property {number} [maxSummaryLength=1000]
  * @property {boolean} [toolsEnabled=true]
  * @property {number} [maxToolCalls=1]
- * @property {number} [temperature=0.3]
+ * @property {number} [temperature=0]
  * @property {number} [summaryTemperature=0.1]
  * @property {boolean} [allowUnknownAnswers=false]
  */
@@ -87,6 +87,7 @@
  * @property {string} description
  * @property {string} [instructions]
  * @property {Object} parameters
+ * @property {(input: {message: string}, context: Object) => boolean} [shouldUse]
  * @property {(input: Object, context: Object) => Promise<{ok?: boolean, data?: Object}|Object>} execute
  */
 

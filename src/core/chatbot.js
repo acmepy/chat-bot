@@ -39,7 +39,6 @@ export function createChatbot(options = {}) {
     const summary = session.summary || '';
     const history = [...(session.messages || [])];
     const toolsMetadata = config.toolsEnabled ? toolRegistry.getMetadata() : [];
-    const deterministicToolCall = getDeterministicToolCall(message, toolRegistry, config);
 
     const prompt = promptBuilder.build({
       systemPrompt,
@@ -48,7 +47,7 @@ export function createChatbot(options = {}) {
       summary,
       history,
       message,
-      tools: toolsMetadata
+      tools: []
     });
 
     const now = new Date().toISOString();
@@ -56,14 +55,18 @@ export function createChatbot(options = {}) {
 
     await sessionProvider.addMessage(session.id, userMessage);
 
-    let answer;
-    if (deterministicToolCall) {
-      const toolResult = await toolRunner.run(deterministicToolCall.tool, deterministicToolCall.input, {
+    async function generateWithToolResult(toolCall) {
+      const toolResult = await toolRunner.run(toolCall.tool, toolCall.input, {
         context: context || {},
         session,
         resources,
         config
       });
+      const toolAnswer = getToolAnswer(toolResult);
+      if (toolAnswer !== null) {
+        return toolAnswer;
+      }
+
       const finalPrompt = promptBuilder.build({
         systemPrompt,
         resources,
@@ -74,7 +77,7 @@ export function createChatbot(options = {}) {
         toolResult
       });
 
-      answer = await llmProvider.generate({
+      return llmProvider.generate({
         prompt: finalPrompt,
         systemPrompt,
         resources,
@@ -84,6 +87,20 @@ export function createChatbot(options = {}) {
         message,
         options: config
       });
+    }
+
+    let answer;
+    const toolCall = (config.toolsEnabled ? getToolCallFromShouldUse(message, toolRegistry, {
+      context: context || {},
+      session,
+      resources,
+      summary,
+      history,
+      config
+    }) : null) || await selectToolCall();
+
+    if (config.toolsEnabled && config.maxToolCalls === 1 && toolCall) {
+      answer = await generateWithToolResult(toolCall);
     } else {
       answer = await llmProvider.generate({
         prompt,
@@ -95,36 +112,6 @@ export function createChatbot(options = {}) {
         message,
         options: config
       });
-
-      const toolCall = parseToolCall(answer, toolRegistry);
-      if (config.toolsEnabled && config.maxToolCalls === 1 && toolCall) {
-        const toolResult = await toolRunner.run(toolCall.tool, toolCall.input, {
-          context: context || {},
-          session,
-          resources,
-          config
-        });
-        const finalPrompt = promptBuilder.build({
-          systemPrompt,
-          resources,
-          context: context || '',
-          summary,
-          history,
-          message,
-          toolResult
-        });
-
-        answer = await llmProvider.generate({
-          prompt: finalPrompt,
-          systemPrompt,
-          resources,
-          context: context || '',
-          summary,
-          history,
-          message,
-          options: config
-        });
-      }
     }
 
     const assistantMessage = { role: 'assistant', content: answer, createdAt: now };
@@ -139,56 +126,79 @@ export function createChatbot(options = {}) {
     }
 
     return { sessionId: session.id, answer };
+
+    async function selectToolCall() {
+      if (!config.toolsEnabled || config.maxToolCalls !== 1 || toolsMetadata.length === 0) {
+        return null;
+      }
+
+      const toolSelectionPrompt = promptBuilder.buildToolSelection({
+        systemPrompt,
+        resources,
+        context: context || '',
+        summary,
+        history,
+        message,
+        tools: toolsMetadata
+      });
+      const toolSelection = await llmProvider.generate({
+        prompt: toolSelectionPrompt,
+        systemPrompt,
+        resources,
+        context: context || '',
+        summary,
+        history,
+        message,
+        options: {
+          ...config,
+          temperature: 0,
+          format: 'json'
+        }
+      });
+
+      return parseToolCall(toolSelection, toolRegistry);
+    }
   }
 
   return { sendMessage };
 }
 
-function getDeterministicToolCall(message, registry, config) {
-  if (!config.toolsEnabled || config.maxToolCalls !== 1 || !registry.get('getCurrentDate')) {
-    return null;
+function getToolAnswer(toolResult) {
+  if (toolResult?.ok && typeof toolResult.data?.answer === 'string') {
+    return toolResult.data.answer;
   }
 
-  if (!isDateTimeQuestion(message)) {
-    return null;
+  return null;
+}
+
+function getToolCallFromShouldUse(message, registry, context) {
+  for (const tool of registry.list()) {
+    if (typeof tool.shouldUse !== 'function') {
+      continue;
+    }
+
+    const shouldUse = tool.shouldUse({ message }, context);
+    if (shouldUse) {
+      return {
+        tool: tool.name,
+        input: {
+          query: message
+        }
+      };
+    }
   }
 
-  return {
-    tool: 'getCurrentDate',
-    input: {}
-  };
-}
-
-function isDateTimeQuestion(message) {
-  const normalized = normalizeText(message);
-
-  return [
-    /\bque hora\b/,
-    /\bhora es\b/,
-    /\bhora actual\b/,
-    /\bfecha actual\b/,
-    /\bque fecha\b/,
-    /\bfecha es\b/,
-    /\bdia es hoy\b/,
-    /\bque dia\b/,
-    /\bmomento actual\b/
-  ].some((pattern) => pattern.test(normalized));
-}
-
-function normalizeText(value) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+  return null;
 }
 
 function parseToolCall(response, registry) {
   let parsed;
+  const content = String(response || '').trim();
 
   try {
-    parsed = JSON.parse(String(response || '').trim());
+    parsed = JSON.parse(content);
   } catch {
-    return null;
+    parsed = parseToolCallFromText(content);
   }
 
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -211,4 +221,27 @@ function parseToolCall(response, registry) {
     tool: parsed.tool,
     input: parsed.input
   };
+}
+
+function parseToolCallFromText(content) {
+  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) {
+    try {
+      return JSON.parse(fenced[1].trim());
+    } catch {
+      return null;
+    }
+  }
+
+  const jsonStart = content.indexOf('{');
+  const jsonEnd = content.lastIndexOf('}');
+  if (jsonStart === -1 || jsonEnd <= jsonStart) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(content.slice(jsonStart, jsonEnd + 1));
+  } catch {
+    return null;
+  }
 }

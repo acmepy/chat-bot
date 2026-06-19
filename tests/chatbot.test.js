@@ -13,6 +13,7 @@ describe('exports públicos', () => {
     assert.equal(typeof mod.ToolRunner, 'function');
     assert.equal(typeof mod.searchResourcesTool, 'object');
     assert.equal(typeof mod.getCurrentDateTool, 'object');
+    assert.equal(typeof mod.getCustomerBalanceDetailTool, 'object');
   });
 });
 
@@ -323,26 +324,61 @@ describe('createChatbot', () => {
     assert.equal(llmProvider.generate.mock.callCount(), 2);
   });
 
-  it('debe ejecutar getCurrentDate directamente para preguntas de hora', async () => {
+  it('debe responder normal cuando la seleccion de tool devuelve null', async () => {
+    const { createChatbot } = await import('../src/core/chatbot.js');
+    const tool = {
+      name: 'lookup',
+      description: 'Busca informacion de prueba.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: mock.fn(async () => ({ ok: true, data: { value: 'dato' } }))
+    };
+    const llmProvider = {
+      generate: mock.fn(({ prompt }) => prompt.includes('SELECCION DE TOOL')
+        ? JSON.stringify({ tool: null, input: {} })
+        : 'respuesta normal')
+    };
+    const resourceProvider = {
+      loadResources: mock.fn(() => ''),
+      loadSystemPrompt: mock.fn(() => '')
+    };
+    const sessionProvider = {
+      createSession: mock.fn(async (data) => ({ id: 's1', summary: '', messages: [], ...data })),
+      getSession: mock.fn(() => null),
+      addMessage: mock.fn(),
+      saveSession: mock.fn(),
+      getHistory: mock.fn(() => []),
+      getSummary: mock.fn(() => null),
+      updateSummary: mock.fn()
+    };
+
+    const chatbot = createChatbot({ llmProvider, resourceProvider, sessionProvider, tools: [tool] });
+    const result = await chatbot.sendMessage({ message: 'Hola' });
+
+    assert.equal(result.answer, 'respuesta normal');
+    assert.equal(tool.execute.mock.callCount(), 0);
+    assert.equal(llmProvider.generate.mock.callCount(), 2);
+    assert.equal(llmProvider.generate.mock.calls[0].arguments[0].options.format, 'json');
+  });
+
+  it('debe ejecutar getCurrentDate cuando el LLM solicita la tool', async () => {
     const { createChatbot } = await import('../src/core/chatbot.js');
     const tool = {
       name: 'getCurrentDate',
       description: 'Devuelve la fecha y hora actual.',
+      instructions: 'Usar para preguntas de hora.',
       parameters: { type: 'object', properties: {}, required: [] },
       execute: mock.fn(async () => ({
         ok: true,
         data: {
           now: '2026-06-18T12:00:00.000Z',
           localNow: '18/6/2026, 08:00:00 hora de Paraguay',
-          timezone: 'America/Asuncion'
+          timezone: 'America/Asuncion',
+          answer: 'Son las 08:00 en America/Asuncion.'
         }
       }))
     };
     const llmProvider = {
-      generate: mock.fn(({ prompt }) => {
-        assert.match(prompt, /RESULTADO DE TOOL/);
-        return 'Son las 08:00 en America/Asuncion.';
-      })
+      generate: mock.fn(() => '```json\n{"tool":"getCurrentDate","input":{"query":"Que hora es?"}}\n```')
     };
     const resourceProvider = {
       loadResources: mock.fn(() => ''),
@@ -369,7 +405,212 @@ describe('createChatbot', () => {
 
     assert.equal(result.answer, 'Son las 08:00 en America/Asuncion.');
     assert.equal(tool.execute.mock.callCount(), 1);
+    assert.deepEqual(tool.execute.mock.calls[0].arguments[0], { query: 'Que hora es?' });
     assert.equal(llmProvider.generate.mock.callCount(), 1);
+  });
+
+  it('debe ejecutar getCustomerBalanceDetail cuando el LLM solicita la tool', async () => {
+    const { createChatbot } = await import('../src/core/chatbot.js');
+    const tool = {
+      name: 'getCustomerBalanceDetail',
+      description: 'Devuelve el detalle de saldo de un cliente.',
+      instructions: 'Usar para consultas de saldo de cliente.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: mock.fn(async (input) => ({
+        ok: true,
+        data: {
+          found: true,
+          query: input.query,
+          answer: 'Detalle de saldo del cliente.'
+        }
+      }))
+    };
+    const llmProvider = {
+      generate: mock.fn(() => JSON.stringify({
+        tool: 'getCustomerBalanceDetail',
+        input: { query: 'Cuales son las facturas pendientes del RUC 80012345-6?' }
+      }))
+    };
+    const resourceProvider = {
+      loadResources: mock.fn(() => ''),
+      loadSystemPrompt: mock.fn(() => '')
+    };
+    const sessionProvider = {
+      createSession: mock.fn(async (data) => ({ id: 's1', summary: '', messages: [], ...data })),
+      getSession: mock.fn(() => null),
+      addMessage: mock.fn(),
+      saveSession: mock.fn(),
+      getHistory: mock.fn(() => []),
+      getSummary: mock.fn(() => null),
+      updateSummary: mock.fn()
+    };
+
+    const chatbot = createChatbot({
+      llmProvider,
+      resourceProvider,
+      sessionProvider,
+      tools: [tool]
+    });
+    const result = await chatbot.sendMessage({
+      message: 'Cuales son las facturas pendientes del RUC 80012345-6?'
+    });
+
+    assert.equal(result.answer, 'Detalle de saldo del cliente.');
+    assert.equal(tool.execute.mock.callCount(), 1);
+    assert.deepEqual(tool.execute.mock.calls[0].arguments[0], {
+      query: 'Cuales son las facturas pendientes del RUC 80012345-6?'
+    });
+    assert.equal(llmProvider.generate.mock.callCount(), 1);
+  });
+
+  it('debe responder data.answer de la tool aunque el resumen diga que no habia informacion', async () => {
+    const { createChatbot } = await import('../src/core/chatbot.js');
+    const session = {
+      id: 's1',
+      summary: 'Saldo de CLI-002: No se tiene informacion disponible.',
+      messages: []
+    };
+    const tool = {
+      name: 'getCustomerBalanceDetail',
+      description: 'Devuelve el detalle de saldo de un cliente.',
+      instructions: 'Usar para consultas de saldo de cliente.',
+      parameters: { type: 'object', properties: {}, required: [] },
+      execute: mock.fn(async (input) => ({
+        ok: true,
+        data: {
+          found: true,
+          query: input.query,
+          answer: 'Detalle de saldo de Cliente Demo.'
+        }
+      }))
+    };
+    const llmProvider = {
+      generate: mock.fn(() => JSON.stringify({
+        tool: 'getCustomerBalanceDetail',
+        input: { query: 'cual es el saldo de CLI-002' }
+      }))
+    };
+    const resourceProvider = {
+      loadResources: mock.fn(() => ''),
+      loadSystemPrompt: mock.fn(() => '')
+    };
+    const sessionProvider = {
+      createSession: mock.fn(),
+      getSession: mock.fn(async () => session),
+      addMessage: mock.fn(),
+      saveSession: mock.fn(),
+      getHistory: mock.fn(() => []),
+      getSummary: mock.fn(() => null),
+      updateSummary: mock.fn()
+    };
+
+    const chatbot = createChatbot({
+      llmProvider,
+      resourceProvider,
+      sessionProvider,
+      tools: [tool]
+    });
+    const result = await chatbot.sendMessage({
+      message: 'cual es el saldo de CLI-002',
+      sessionId: 's1'
+    });
+
+    assert.equal(result.answer, 'Detalle de saldo de Cliente Demo.');
+    assert.equal(tool.execute.mock.callCount(), 1);
+    assert.deepEqual(tool.execute.mock.calls[0].arguments[0], {
+      query: 'cual es el saldo de CLI-002'
+    });
+    assert.equal(llmProvider.generate.mock.callCount(), 1);
+  });
+
+  it('debe usar la tool de saldos en una pregunta de seguimiento con codigo de cliente', async () => {
+    const { createChatbot } = await import('../src/core/chatbot.js');
+    const { getCustomerBalanceDetailTool } = await import('../src/tools/builtin/get-customer-balance-detail.js');
+    const session = { id: 's1', summary: '', messages: [] };
+    const llmProvider = {
+      generate: mock.fn(() => 'No tengo esa respuesta en la informacion disponible.')
+    };
+    const resourceProvider = {
+      loadResources: mock.fn(() => ''),
+      loadSystemPrompt: mock.fn(() => '')
+    };
+    const sessionProvider = {
+      createSession: mock.fn(async () => session),
+      getSession: mock.fn(async () => session),
+      addMessage: mock.fn(async (id, msg) => {
+        session.messages.push(msg);
+      }),
+      saveSession: mock.fn(),
+      getHistory: mock.fn(() => []),
+      getSummary: mock.fn(() => null),
+      updateSummary: mock.fn()
+    };
+
+    const chatbot = createChatbot({
+      llmProvider,
+      resourceProvider,
+      sessionProvider,
+      tools: [getCustomerBalanceDetailTool]
+    });
+
+    await chatbot.sendMessage({
+      message: 'cual es el saldo del cliente CLI-002',
+      sessionId: 's1'
+    });
+    const result = await chatbot.sendMessage({
+      message: 'y del cliente CLI-001',
+      sessionId: 's1'
+    });
+
+    assert.match(result.answer, /Comercial San Miguel/);
+    assert.match(result.answer, /Total pendiente/);
+    assert.equal(llmProvider.generate.mock.callCount(), 0);
+  });
+
+  it('debe usar la tool de saldos aunque el resumen previo diga que no habia informacion', async () => {
+    const { createChatbot } = await import('../src/core/chatbot.js');
+    const { getCustomerBalanceDetailTool } = await import('../src/tools/builtin/get-customer-balance-detail.js');
+    const session = {
+      id: 's1',
+      summary: 'Saldo de Cliente Cli-001: No disponible',
+      messages: [
+        { role: 'assistant', content: 'No tengo esa respuesta en la informacion disponible.' }
+      ]
+    };
+    const llmProvider = {
+      generate: mock.fn(() => 'No tengo esa respuesta en la informacion disponible.')
+    };
+    const resourceProvider = {
+      loadResources: mock.fn(() => ''),
+      loadSystemPrompt: mock.fn(() => '')
+    };
+    const sessionProvider = {
+      createSession: mock.fn(),
+      getSession: mock.fn(async () => session),
+      addMessage: mock.fn(async (id, msg) => {
+        session.messages.push(msg);
+      }),
+      saveSession: mock.fn(),
+      getHistory: mock.fn(() => []),
+      getSummary: mock.fn(() => null),
+      updateSummary: mock.fn()
+    };
+
+    const chatbot = createChatbot({
+      llmProvider,
+      resourceProvider,
+      sessionProvider,
+      tools: [getCustomerBalanceDetailTool]
+    });
+
+    const result = await chatbot.sendMessage({
+      message: 'cual es el saldo de cliente cli-001',
+      sessionId: 's1'
+    });
+
+    assert.match(result.answer, /Comercial San Miguel/);
+    assert.match(result.answer, /2\.090\.000/);
+    assert.equal(llmProvider.generate.mock.callCount(), 0);
   });
 
   it('no debe ejecutar tools si toolsEnabled es false', async () => {

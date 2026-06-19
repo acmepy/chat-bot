@@ -20,7 +20,7 @@ export const getCurrentDateTool = defineTool({
         now: now.toISOString(),
         localNow,
         timezone,
-        answer: `La fecha y hora actual es ${localNow}.`
+        answer: `La fecha y hora actual es ${localNow}`
       }
     };
   }

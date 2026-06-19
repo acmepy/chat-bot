@@ -9,7 +9,8 @@ import {
   FileResourceProvider,
   FileSessionProvider,
   searchResourcesTool,
-  getCurrentDateTool
+  getCurrentDateTool,
+  getCustomerBalanceDetailTool
 } from '../../src/index.js';
 
 const exampleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -20,7 +21,8 @@ const chatbot = createChatbot({
   sessionProvider: new FileSessionProvider({ path: path.join(exampleDir, '..', '..', '.sessions') }),
   tools: [
     searchResourcesTool,
-    getCurrentDateTool
+    getCurrentDateTool,
+    getCustomerBalanceDetailTool
   ]
 });
 

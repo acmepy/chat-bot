@@ -25,4 +25,7 @@ export function validateTool(tool) {
   if (tool.instructions !== undefined && typeof tool.instructions !== 'string') {
     throw new Error(`Tool invalida: instructions debe ser string para ${tool.name}`);
   }
+  if (tool.shouldUse !== undefined && typeof tool.shouldUse !== 'function') {
+    throw new Error(`Tool invalida: shouldUse debe ser funcion para ${tool.name}`);
+  }
 }
