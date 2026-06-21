@@ -45,7 +45,8 @@ import {
   FileSessionProvider,
   searchResourcesTool,
   getCurrentDateTool,
-  getCustomerBalanceDetailTool
+  getCustomerBalanceDetailTool,
+  pingHostTool
 } from 'chatbot-core';
 
 const chatbot = createChatbot({
@@ -61,7 +62,8 @@ const chatbot = createChatbot({
   tools: [
     searchResourcesTool,
     getCurrentDateTool,
-    getCustomerBalanceDetailTool
+    getCustomerBalanceDetailTool,
+    pingHostTool
   ]
 });
 
@@ -115,7 +117,8 @@ import {
   ToolRunner,
   searchResourcesTool,
   getCurrentDateTool,
-  getCustomerBalanceDetailTool
+  getCustomerBalanceDetailTool,
+  pingHostTool
 } from 'chatbot-core';
 ```
 
@@ -348,6 +351,41 @@ Si el usuario pide detalle de saldo, facturas pendientes, deuda o saldo pendient
 ```
 
 Por ahora lee datos desde `src/tools/data/customer-balances.json`. Mas adelante se puede cambiar el `execute` para hacer `fetch` a una API REST sin modificar el core.
+
+`pingHostTool` hace ping a un equipo registrado en `src/tools/data/host.json`:
+
+```js
+import { pingHostTool } from 'chatbot-core';
+```
+
+Input esperado:
+
+```js
+{ query: 'ping servidor-villeta' }
+```
+
+O:
+
+```js
+{ name: 'servidor-villeta' }
+```
+
+Respuesta principal:
+
+```js
+{
+  found: true,
+  reachable: true,
+  host: { name: 'servidor-villeta', ip: '192.168.1.2' },
+  answer: 'servidor-villeta (192.168.1.2) responde OK.'
+}
+```
+
+Instruccion cargada en el prompt:
+
+```txt
+Si el usuario pide hacer ping o verificar si responde un equipo registrado, usa esta tool.
+```
 
 Estas tools son informativas. No consultan datos reales del ERP ni modifican datos externos.
 

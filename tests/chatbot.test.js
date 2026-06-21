@@ -14,6 +14,7 @@ describe('exports públicos', () => {
     assert.equal(typeof mod.searchResourcesTool, 'object');
     assert.equal(typeof mod.getCurrentDateTool, 'object');
     assert.equal(typeof mod.getCustomerBalanceDetailTool, 'object');
+    assert.equal(typeof mod.pingHostTool, 'object');
   });
 });
 
@@ -610,6 +611,42 @@ describe('createChatbot', () => {
 
     assert.match(result.answer, /Comercial San Miguel/);
     assert.match(result.answer, /2\.090\.000/);
+    assert.equal(llmProvider.generate.mock.callCount(), 0);
+  });
+
+  it('debe usar la tool de ping y responder el answer directo', async () => {
+    const { createChatbot } = await import('../src/core/chatbot.js');
+    const { pingHostTool } = await import('../src/tools/builtin/ping-host.js');
+    const llmProvider = {
+      generate: mock.fn(() => 'No tengo esa respuesta en la informacion disponible.')
+    };
+    const resourceProvider = {
+      loadResources: mock.fn(() => ''),
+      loadSystemPrompt: mock.fn(() => '')
+    };
+    const sessionProvider = {
+      createSession: mock.fn(async (data) => ({ id: 's1', summary: '', messages: [], ...data })),
+      getSession: mock.fn(() => null),
+      addMessage: mock.fn(),
+      saveSession: mock.fn(),
+      getHistory: mock.fn(() => []),
+      getSummary: mock.fn(() => null),
+      updateSummary: mock.fn()
+    };
+    const pingHost = mock.fn(async () => true);
+
+    const chatbot = createChatbot({
+      llmProvider,
+      resourceProvider,
+      sessionProvider,
+      tools: [pingHostTool],
+      pingHost
+    });
+
+    const result = await chatbot.sendMessage({ message: 'ping servidor-villeta' });
+
+    assert.equal(result.answer, 'servidor-villeta (192.168.1.2) responde OK.');
+    assert.equal(pingHost.mock.callCount(), 1);
     assert.equal(llmProvider.generate.mock.callCount(), 0);
   });
 

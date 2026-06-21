@@ -1,0 +1,6 @@
+[
+    {"ip":"192.100.100.254", "name":"mail"},
+    {"ip":"192.100.100.100", "name":"servidor-central"},
+    {"ip":"192.168.1.2", "name":"servidor-villeta"},
+    {"ip":"127.0.0.1", "name":"hugo-hp"}
+]

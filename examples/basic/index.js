@@ -10,7 +10,8 @@ import {
   FileSessionProvider,
   searchResourcesTool,
   getCurrentDateTool,
-  getCustomerBalanceDetailTool
+  getCustomerBalanceDetailTool,
+  pingHostTool
 } from '../../src/index.js';
 
 const exampleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -22,7 +23,8 @@ const chatbot = createChatbot({
   tools: [
     searchResourcesTool,
     getCurrentDateTool,
-    getCustomerBalanceDetailTool
+    getCustomerBalanceDetailTool,
+    pingHostTool
   ]
 });
 
