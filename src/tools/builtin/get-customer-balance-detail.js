@@ -1,7 +1,4 @@
-import fs from 'fs/promises';
 import { defineTool } from '../base.js';
-
-const DEFAULT_DATA_URL = new URL('../data/customer-balances.json', import.meta.url);
 
 function normalize(value) {
   return String(value || '').trim().toLowerCase();
@@ -93,95 +90,91 @@ function buildAnswer(customer, total) {
   ].join(`\n`);
 }
 
-async function loadCustomers(dataUrl = DEFAULT_DATA_URL) {
-  const content = await fs.readFile(dataUrl, 'utf-8');
-  return JSON.parse(content);
+export function createCustomerBalanceDetailTool({ customers = [] } = {}) {
+  return defineTool({
+    name: 'getCustomerBalanceDetail',
+    description: 'Devuelve el detalle de saldo de un cliente.',
+    instructions: 'Si el usuario pide detalle de saldo, facturas pendientes, deuda o saldo pendiente de un cliente, usa esta tool. Tambien usala en preguntas de seguimiento sobre otro cliente. Envia preferentemente input.query con el mensaje original completo.',
+    shouldUse({ message } = {}, context = {}) {
+      return shouldUseForBalanceDetail(message, context);
+    },
+    parameters: {
+      type: 'object',
+      properties: {
+        ruc: {
+          type: 'string',
+          description: 'RUC del cliente.'
+        },
+        customerCode: {
+          type: 'string',
+          description: 'Codigo interno del cliente.'
+        },
+        query: {
+          type: 'string',
+          description: 'Mensaje original del usuario para extraer RUC o codigo si no vienen separados.'
+        }
+      },
+      required: []
+    },
+    async execute(input = {}) {
+      const query = input.query || Object.values(input).filter((value) => typeof value === 'string').join(' ');
+      const extracted = extractInput(query);
+      const ruc = normalizeIdentifier(input.ruc || extracted.ruc);
+      const customerCode = normalizeIdentifier(
+        input.customerCode ||
+        input.customer_code ||
+        input.codigoCliente ||
+        input.codigo ||
+        input.code ||
+        input.customerId ||
+        extracted.customerCode
+      );
+
+      if (!ruc && !customerCode) {
+        return {
+          ok: true,
+          data: {
+            found: false,
+            answer: 'Indique el RUC o codigo de cliente para consultar el detalle de saldo.'
+          }
+        };
+      }
+
+      const customer = customers.find((item) => (
+        normalizeIdentifier(item.ruc) === ruc || normalizeIdentifier(item.customerCode) === customerCode
+      ));
+
+      if (!customer) {
+        return {
+          ok: true,
+          data: {
+            found: false,
+            ruc: input.ruc || null,
+            customerCode: input.customerCode || null,
+            answer: buildAnswer(null)
+          }
+        };
+      }
+
+      const totalPending = customer.pendingInvoices.reduce((total, invoice) => total + invoice.amount, 0);
+
+      return {
+        ok: true,
+        data: {
+          found: true,
+          customer: {
+            code: customer.customerCode,
+            ruc: customer.ruc,
+            name: customer.name
+          },
+          currency: customer.currency,
+          totalPending,
+          pendingInvoices: customer.pendingInvoices,
+          answer: buildAnswer(customer, totalPending)
+        }
+      };
+    }
+  });
 }
 
-export const getCustomerBalanceDetailTool = defineTool({
-  name: 'getCustomerBalanceDetail',
-  description: 'Devuelve el detalle de saldo de un cliente desde datos mockeados.',
-  instructions: 'Si el usuario pide detalle de saldo, facturas pendientes, deuda o saldo pendiente de un cliente, usa esta tool. Tambien usala en preguntas de seguimiento sobre otro cliente. Envia preferentemente input.query con el mensaje original completo.',
-  shouldUse({ message } = {}, context = {}) {
-    return shouldUseForBalanceDetail(message, context);
-  },
-  parameters: {
-    type: 'object',
-    properties: {
-      ruc: {
-        type: 'string',
-        description: 'RUC del cliente.'
-      },
-      customerCode: {
-        type: 'string',
-        description: 'Codigo interno del cliente.'
-      },
-      query: {
-        type: 'string',
-        description: 'Mensaje original del usuario para extraer RUC o codigo si no vienen separados.'
-      }
-    },
-    required: []
-  },
-  async execute(input = {}, context = {}) {
-    const query = input.query || Object.values(input).filter((value) => typeof value === 'string').join(' ');
-    const extracted = extractInput(query);
-    const ruc = normalizeIdentifier(input.ruc || extracted.ruc);
-    const customerCode = normalizeIdentifier(
-      input.customerCode ||
-      input.customer_code ||
-      input.codigoCliente ||
-      input.codigo ||
-      input.code ||
-      input.customerId ||
-      extracted.customerCode
-    );
-
-    if (!ruc && !customerCode) {
-      return {
-        ok: true,
-        data: {
-          found: false,
-          answer: 'Indique el RUC o codigo de cliente para consultar el detalle de saldo.'
-        }
-      };
-    }
-
-    const customers = await loadCustomers(context.config?.customerBalancesDataUrl || DEFAULT_DATA_URL);
-    const customer = customers.find((item) => (
-      normalizeIdentifier(item.ruc) === ruc || normalizeIdentifier(item.customerCode) === customerCode
-    ));
-
-    if (!customer) {
-      return {
-        ok: true,
-        data: {
-          found: false,
-          ruc: input.ruc || null,
-          customerCode: input.customerCode || null,
-          answer: buildAnswer(null)
-        }
-      };
-    }
-
-    const totalPending = customer.pendingInvoices.reduce((total, invoice) => total + invoice.amount, 0);
-
-    return {
-      ok: true,
-      data: {
-        found: true,
-        customer: {
-          code: customer.customerCode,
-          ruc: customer.ruc,
-          name: customer.name
-        },
-        currency: customer.currency,
-        totalPending,
-        pendingInvoices: customer.pendingInvoices,
-        answer: buildAnswer(customer, totalPending)
-      }
-    };
-  }
-});
-
-export default getCustomerBalanceDetailTool;
+export default createCustomerBalanceDetailTool;

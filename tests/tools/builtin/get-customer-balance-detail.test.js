@@ -2,8 +2,31 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 describe('getCustomerBalanceDetailTool', () => {
+  const customers = [
+    {
+      customerCode: 'CLI-001',
+      ruc: '80012345-6',
+      name: 'Comercial San Miguel S.A.',
+      currency: 'PYG',
+      pendingInvoices: [
+        { number: '001-001-0000123', dueDate: '2026-05-15', amount: 1250000 },
+        { number: '001-001-0000124', dueDate: '2026-06-10', amount: 840000 }
+      ]
+    },
+    {
+      customerCode: 'CLI-002',
+      ruc: '1234567-8',
+      name: 'Cliente Demo',
+      currency: 'PYG',
+      pendingInvoices: [
+        { number: '001-002-0000340', dueDate: '2026-05-21', amount: 320000 }
+      ]
+    }
+  ];
+
   it('debe declarar instrucciones de uso', async () => {
-    const { getCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const { createCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const getCustomerBalanceDetailTool = createCustomerBalanceDetailTool({ customers });
 
     assert.match(getCustomerBalanceDetailTool.instructions, /saldo/);
     assert.match(getCustomerBalanceDetailTool.instructions, /seguimiento/);
@@ -16,7 +39,8 @@ describe('getCustomerBalanceDetailTool', () => {
   });
 
   it('debe extraer RUC desde query', async () => {
-    const { getCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const { createCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const getCustomerBalanceDetailTool = createCustomerBalanceDetailTool({ customers });
 
     const result = await getCustomerBalanceDetailTool.execute({
       query: 'Cuales son las facturas pendientes del RUC 80012345-6?'
@@ -28,7 +52,8 @@ describe('getCustomerBalanceDetailTool', () => {
   });
 
   it('debe devolver facturas pendientes por RUC', async () => {
-    const { getCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const { createCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const getCustomerBalanceDetailTool = createCustomerBalanceDetailTool({ customers });
 
     const result = await getCustomerBalanceDetailTool.execute({ ruc: '80012345-6' });
 
@@ -41,7 +66,8 @@ describe('getCustomerBalanceDetailTool', () => {
   });
 
   it('debe devolver facturas pendientes por codigo de cliente', async () => {
-    const { getCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const { createCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const getCustomerBalanceDetailTool = createCustomerBalanceDetailTool({ customers });
 
     const result = await getCustomerBalanceDetailTool.execute({ customerCode: 'CLI-002' });
 
@@ -52,7 +78,8 @@ describe('getCustomerBalanceDetailTool', () => {
   });
 
   it('debe aceptar alias y puntuacion en codigo de cliente', async () => {
-    const { getCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const { createCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const getCustomerBalanceDetailTool = createCustomerBalanceDetailTool({ customers });
 
     const result = await getCustomerBalanceDetailTool.execute({ codigoCliente: 'cli-001.' });
 
@@ -63,7 +90,8 @@ describe('getCustomerBalanceDetailTool', () => {
   });
 
   it('debe responder cuando no encuentra cliente', async () => {
-    const { getCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const { createCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const getCustomerBalanceDetailTool = createCustomerBalanceDetailTool({ customers });
 
     const result = await getCustomerBalanceDetailTool.execute({ ruc: 'no-existe' });
 
@@ -73,7 +101,8 @@ describe('getCustomerBalanceDetailTool', () => {
   });
 
   it('debe pedir identificador si no recibe RUC ni codigo', async () => {
-    const { getCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const { createCustomerBalanceDetailTool } = await import('../../../src/tools/builtin/get-customer-balance-detail.js');
+    const getCustomerBalanceDetailTool = createCustomerBalanceDetailTool({ customers });
 
     const result = await getCustomerBalanceDetailTool.execute({});
 

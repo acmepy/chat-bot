@@ -45,9 +45,23 @@ import {
   FileSessionProvider,
   searchResourcesTool,
   getCurrentDateTool,
-  getCustomerBalanceDetailTool,
-  pingHostTool
+  createCustomerBalanceDetailTool,
+  createPingHostTool
 } from 'chatbot-core';
+
+const customers = [
+  {
+    customerCode: 'CLI-001',
+    ruc: '80012345-6',
+    name: 'Comercial San Miguel S.A.',
+    currency: 'PYG',
+    pendingInvoices: []
+  }
+];
+
+const hosts = [
+  { name: 'servidor-villeta', ip: '192.168.1.2' }
+];
 
 const chatbot = createChatbot({
   llmProvider: new OllamaProvider({
@@ -62,8 +76,8 @@ const chatbot = createChatbot({
   tools: [
     searchResourcesTool,
     getCurrentDateTool,
-    getCustomerBalanceDetailTool,
-    pingHostTool
+    createCustomerBalanceDetailTool({ customers }),
+    createPingHostTool({ hosts })
   ]
 });
 
@@ -117,8 +131,8 @@ import {
   ToolRunner,
   searchResourcesTool,
   getCurrentDateTool,
-  getCustomerBalanceDetailTool,
-  pingHostTool
+  createCustomerBalanceDetailTool,
+  createPingHostTool
 } from 'chatbot-core';
 ```
 
@@ -313,10 +327,24 @@ Instruccion cargada en el prompt:
 Si el usuario pregunta la hora, fecha, dia actual o momento actual, usa esta tool.
 ```
 
-`getCustomerBalanceDetailTool` devuelve el detalle de saldo de un cliente desde un JSON mockeado incluido en la libreria:
+`createCustomerBalanceDetailTool` crea una tool que devuelve el detalle de saldo de clientes recibidos por la aplicacion:
 
 ```js
-import { getCustomerBalanceDetailTool } from 'chatbot-core';
+import { createCustomerBalanceDetailTool } from 'chatbot-core';
+
+const balanceTool = createCustomerBalanceDetailTool({
+  customers: [
+    {
+      customerCode: 'CLI-001',
+      ruc: '80012345-6',
+      name: 'Comercial San Miguel S.A.',
+      currency: 'PYG',
+      pendingInvoices: [
+        { number: '001-001-0000123', dueDate: '2026-05-15', amount: 1250000 }
+      ]
+    }
+  ]
+});
 ```
 
 Input esperado:
@@ -350,12 +378,18 @@ Instruccion cargada en el prompt:
 Si el usuario pide detalle de saldo, facturas pendientes, deuda o saldo pendiente de un cliente, usa esta tool. Tambien usala en preguntas de seguimiento sobre otro cliente.
 ```
 
-Por ahora lee datos desde `src/tools/data/customer-balances.json`. Mas adelante se puede cambiar el `execute` para hacer `fetch` a una API REST sin modificar el core.
+La libreria no lee datos de clientes por su cuenta. La aplicacion puede cargar el array desde JSON, base de datos, cache o una API REST antes de crear la tool.
 
-`pingHostTool` hace ping a un equipo registrado en `src/tools/data/host.json`:
+`createPingHostTool` crea una tool que hace ping a equipos registrados por la aplicacion:
 
 ```js
-import { pingHostTool } from 'chatbot-core';
+import { createPingHostTool } from 'chatbot-core';
+
+const pingHostTool = createPingHostTool({
+  hosts: [
+    { name: 'servidor-villeta', ip: '192.168.1.2' }
+  ]
+});
 ```
 
 Input esperado:

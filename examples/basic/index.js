@@ -1,4 +1,5 @@
 
+import fs from 'fs/promises';
 import path from 'path';
 import readline from 'readline/promises';
 import { stdin as input, stdout as output } from 'process';
@@ -10,11 +11,15 @@ import {
   FileSessionProvider,
   searchResourcesTool,
   getCurrentDateTool,
-  getCustomerBalanceDetailTool,
-  pingHostTool
+  createCustomerBalanceDetailTool,
+  createPingHostTool
 } from '../../src/index.js';
 
 const exampleDir = path.dirname(fileURLToPath(import.meta.url));
+const hostsPath = path.join(exampleDir, 'data', 'host.json');
+const customersPath = path.join(exampleDir, 'data', 'customer-balances.json');
+const hosts = JSON.parse(await fs.readFile(hostsPath, 'utf-8'));
+const customers = JSON.parse(await fs.readFile(customersPath, 'utf-8'));
 
 const chatbot = createChatbot({
   llmProvider: new OllamaProvider({model:'llama3.2:3b'}),
@@ -23,8 +28,8 @@ const chatbot = createChatbot({
   tools: [
     searchResourcesTool,
     getCurrentDateTool,
-    getCustomerBalanceDetailTool,
-    pingHostTool
+    createCustomerBalanceDetailTool({ customers }),
+    createPingHostTool({ hosts })
   ]
 });
 

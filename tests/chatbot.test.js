@@ -1,6 +1,28 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
+const customerBalances = [
+  {
+    customerCode: 'CLI-001',
+    ruc: '80012345-6',
+    name: 'Comercial San Miguel S.A.',
+    currency: 'PYG',
+    pendingInvoices: [
+      { number: '001-001-0000123', dueDate: '2026-05-15', amount: 1250000 },
+      { number: '001-001-0000124', dueDate: '2026-06-10', amount: 840000 }
+    ]
+  },
+  {
+    customerCode: 'CLI-002',
+    ruc: '1234567-8',
+    name: 'Cliente Demo',
+    currency: 'PYG',
+    pendingInvoices: [
+      { number: '001-002-0000340', dueDate: '2026-05-21', amount: 320000 }
+    ]
+  }
+];
+
 describe('exports públicos', () => {
   it('debe exportar la API publica', async () => {
     const mod = await import('../src/index.js');
@@ -13,8 +35,8 @@ describe('exports públicos', () => {
     assert.equal(typeof mod.ToolRunner, 'function');
     assert.equal(typeof mod.searchResourcesTool, 'object');
     assert.equal(typeof mod.getCurrentDateTool, 'object');
-    assert.equal(typeof mod.getCustomerBalanceDetailTool, 'object');
-    assert.equal(typeof mod.pingHostTool, 'object');
+    assert.equal(typeof mod.createCustomerBalanceDetailTool, 'function');
+    assert.equal(typeof mod.createPingHostTool, 'function');
   });
 });
 
@@ -526,7 +548,8 @@ describe('createChatbot', () => {
 
   it('debe usar la tool de saldos en una pregunta de seguimiento con codigo de cliente', async () => {
     const { createChatbot } = await import('../src/core/chatbot.js');
-    const { getCustomerBalanceDetailTool } = await import('../src/tools/builtin/get-customer-balance-detail.js');
+    const { createCustomerBalanceDetailTool } = await import('../src/tools/builtin/get-customer-balance-detail.js');
+    const getCustomerBalanceDetailTool = createCustomerBalanceDetailTool({ customers: customerBalances });
     const session = { id: 's1', summary: '', messages: [] };
     const llmProvider = {
       generate: mock.fn(() => 'No tengo esa respuesta en la informacion disponible.')
@@ -570,7 +593,8 @@ describe('createChatbot', () => {
 
   it('debe usar la tool de saldos aunque el resumen previo diga que no habia informacion', async () => {
     const { createChatbot } = await import('../src/core/chatbot.js');
-    const { getCustomerBalanceDetailTool } = await import('../src/tools/builtin/get-customer-balance-detail.js');
+    const { createCustomerBalanceDetailTool } = await import('../src/tools/builtin/get-customer-balance-detail.js');
+    const getCustomerBalanceDetailTool = createCustomerBalanceDetailTool({ customers: customerBalances });
     const session = {
       id: 's1',
       summary: 'Saldo de Cliente Cli-001: No disponible',
@@ -616,7 +640,7 @@ describe('createChatbot', () => {
 
   it('debe usar la tool de ping y responder el answer directo', async () => {
     const { createChatbot } = await import('../src/core/chatbot.js');
-    const { pingHostTool } = await import('../src/tools/builtin/ping-host.js');
+    const { createPingHostTool } = await import('../src/tools/builtin/ping-host.js');
     const llmProvider = {
       generate: mock.fn(() => 'No tengo esa respuesta en la informacion disponible.')
     };
@@ -634,13 +658,16 @@ describe('createChatbot', () => {
       updateSummary: mock.fn()
     };
     const pingHost = mock.fn(async () => true);
+    const pingHostTool = createPingHostTool({
+      hosts: [{ ip: '192.168.1.2', name: 'servidor-villeta' }],
+      pingHost
+    });
 
     const chatbot = createChatbot({
       llmProvider,
       resourceProvider,
       sessionProvider,
-      tools: [pingHostTool],
-      pingHost
+      tools: [pingHostTool]
     });
 
     const result = await chatbot.sendMessage({ message: 'ping servidor-villeta' });

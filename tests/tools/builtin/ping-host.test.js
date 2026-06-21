@@ -2,8 +2,14 @@ import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 describe('pingHostTool', () => {
+  const hosts = [
+    { ip: '192.100.100.100', name: 'servidor-central' },
+    { ip: '192.168.1.2', name: 'servidor-villeta' }
+  ];
+
   it('debe declarar instrucciones de uso', async () => {
-    const { pingHostTool } = await import('../../../src/tools/builtin/ping-host.js');
+    const { createPingHostTool } = await import('../../../src/tools/builtin/ping-host.js');
+    const pingHostTool = createPingHostTool({ hosts });
 
     assert.match(pingHostTool.instructions, /ping/);
     assert.equal(pingHostTool.shouldUse({ message: 'ping servidor-villeta' }), true);
@@ -11,12 +17,11 @@ describe('pingHostTool', () => {
   });
 
   it('debe hacer ping a un equipo por query y responder OK', async () => {
-    const { pingHostTool } = await import('../../../src/tools/builtin/ping-host.js');
     const pingHost = mock.fn(async () => true);
+    const { createPingHostTool } = await import('../../../src/tools/builtin/ping-host.js');
+    const pingHostTool = createPingHostTool({ hosts, pingHost });
 
-    const result = await pingHostTool.execute({ query: 'ping servidor-villeta' }, {
-      config: { pingHost }
-    });
+    const result = await pingHostTool.execute({ query: 'ping servidor-villeta' });
 
     assert.equal(result.ok, true);
     assert.equal(result.data.found, true);
@@ -28,12 +33,11 @@ describe('pingHostTool', () => {
   });
 
   it('debe responder cuando el equipo no responde', async () => {
-    const { pingHostTool } = await import('../../../src/tools/builtin/ping-host.js');
     const pingHost = mock.fn(async () => false);
+    const { createPingHostTool } = await import('../../../src/tools/builtin/ping-host.js');
+    const pingHostTool = createPingHostTool({ hosts, pingHost });
 
-    const result = await pingHostTool.execute({ name: 'servidor-central' }, {
-      config: { pingHost }
-    });
+    const result = await pingHostTool.execute({ name: 'servidor-central' });
 
     assert.equal(result.ok, true);
     assert.equal(result.data.found, true);
@@ -42,12 +46,11 @@ describe('pingHostTool', () => {
   });
 
   it('debe responder cuando no encuentra el equipo', async () => {
-    const { pingHostTool } = await import('../../../src/tools/builtin/ping-host.js');
     const pingHost = mock.fn(async () => true);
+    const { createPingHostTool } = await import('../../../src/tools/builtin/ping-host.js');
+    const pingHostTool = createPingHostTool({ hosts, pingHost });
 
-    const result = await pingHostTool.execute({ query: 'ping servidor-inexistente' }, {
-      config: { pingHost }
-    });
+    const result = await pingHostTool.execute({ query: 'ping servidor-inexistente' });
 
     assert.equal(result.ok, true);
     assert.equal(result.data.found, false);
